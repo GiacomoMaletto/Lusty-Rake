@@ -1,0 +1,404 @@
+local function getQuad(axis_x,axis_y,vert_x,vert_y)
+	if vert_x < axis_x then
+		if vert_y < axis_y then
+			return 1
+		else
+			return 4
+		end
+	else
+		if vert_y < axis_y then
+			return 2
+		else
+			return 3
+		end	
+	end
+end
+local function pointInPolygon(pgon, tx, ty)
+	if (#pgon < 6) then
+		return false
+	end
+ 
+	local x1 = pgon[#pgon - 1]
+	local y1 = pgon[#pgon]
+	local cur_quad = getQuad(tx,ty,x1,y1)
+	local next_quad
+	local total = 0
+	local i
+ 
+	for i = 1,#pgon,2 do
+		local x2 = pgon[i]
+		local y2 = pgon[i+1]
+		next_quad = getQuad(tx,ty,x2,y2)
+		local diff = next_quad - cur_quad
+ 
+		if (diff == 2) or (diff == -2) then
+			if (x2 - (((y2 - ty) * (x1 - x2)) / (y1 - y2))) < tx then
+				diff = -diff
+			end
+		elseif diff == 3 then
+			diff = -1
+		elseif diff == -3 then
+			diff = 1
+		end
+ 
+		total = total + diff
+		cur_quad = next_quad
+		x1 = x2
+		y1 = y2
+	end
+ 
+	return (math.abs(total)==4)
+end
+
+local sw, sh = love.graphics.getDimensions()
+local cw, ch = 1280, 960
+local sc = 2/3
+
+local arrow = love.mouse.getSystemCursor("arrow")
+local hand = love.mouse.getSystemCursor("hand")
+
+local n_cubes = 0
+local text = ""
+
+local current = "menu"
+local room = {}
+function room.new(str)
+  return {polygon={}, image=love.graphics.newImage("image/"..str)}
+end
+room["menu"] = room.new("menu.png")
+room["menu"].polygon[1] = {450, 510, 450, 660, 850, 660, 850, 510, type="move", what="panoramica"}
+
+room["panoramica"] = room.new("panoramica.jpg")
+room["panoramica"].left = "scrivania"
+room["panoramica"].right = "letto"
+room["panoramica"].back = "armadione"
+
+room["scrivania"] = room.new("scrivania.jpg")
+room["scrivania"].left = "porta"
+room["scrivania"].right = "lavagna"
+room["scrivania"].back = "panoramica"
+table.insert(room["scrivania"].polygon, {260, 60, 300, 770, 790, 320, 450, 40, type="move", what="computer"})
+table.insert(room["scrivania"].polygon, {930, 400, 890, 550, 1010, 560, 1070, 460, type="move", what="fogli"})
+
+room["computer"] = room.new("computer.jpg")
+room["computer"].back = "scrivania"
+
+room["fogli"] = room.new("fogli.jpg")
+room["fogli"].back = "scrivania"
+
+room["letto"] = room.new("letto.jpg")
+room["letto"].left = "mobile"
+room["letto"].right = "armadione"
+room["letto"].back = "panoramica"
+table.insert(room["letto"].polygon, {710, 520, 920, 680, 910, 910, 1130, 860, 1040, 570, type="move", what="vestiti"})
+
+room["vestiti"] = room.new("vestiti.jpg")
+room["vestiti"].back = "letto"
+
+room["porta"] = room.new("porta chiusa.jpg")
+room["porta"].left = "armadione"
+room["porta"].right = "scrivania"
+table.insert(room["porta"].polygon, {200, 40, 200, 880, 600, 880, 600, 40, type="event", what="porta"})
+
+room["armadione"] = room.new("armadione.jpg")
+room["armadione"].left = "letto"
+room["armadione"].right = "porta"
+room["armadione"].back = "panoramica"
+
+room["mobile"] = room.new("mobile.jpg")
+room["mobile"].left = "altra scrivania"
+room["mobile"].right = "letto"
+table.insert(room["mobile"].polygon, {400, 650, 400, 930, 580, 930, 580, 650, type="move", what="cassetti"})
+table.insert(room["mobile"].polygon, {400, 100, 420, 320, 670, 320, 670, 100, type="move", what="pupazzi"})
+
+room["cassetti"] = room.new("cassetti.jpg")
+room["cassetti"].right = "mobile"
+table.insert(room["cassetti"].polygon, {540, 820, 540, 1000, 700, 1000, 700, 820, type="event", what="chiave"})
+
+room["pupazzi"] = room.new("pupazzi.jpg")
+room["pupazzi"].back = "mobile"
+
+room["altra scrivania"] = room.new("altra scrivania.jpg")
+room["altra scrivania"].left = "finestra"
+room["altra scrivania"].right = "mobile"
+room["altra scrivania"].back = "presa"
+table.insert(room["altra scrivania"].polygon, {170, 10, 170, 170, 1000, 170, 1000, 10, type="move", what="libri"})
+table.insert(room["altra scrivania"].polygon, {330, 400, 200, 740, 960, 730, 880, 400, type="move", what="tastiera"})
+
+room["presa"] = room.new("presa staccata.jpg")
+room["presa"].back = "altra scrivania"
+
+room["libri"] = room.new("libri.jpg")
+room["libri"].back = "altra scrivania"
+
+room["tastiera"] = room.new("tastiera.jpg")
+room["tastiera"].back = "altra scrivania"
+
+room["finestra"] = room.new("finestra.jpg")
+room["finestra"].left = "libreria"
+room["finestra"].right = "altra scrivania"
+
+room["libreria"] = room.new("libreria.jpg")
+room["libreria"].left = "lavagna"
+room["libreria"].right = "finestra"
+
+room["lavagna"] = room.new("11.jpg")
+room["lavagna"].left = "scrivania"
+room["lavagna"].right = "libreria"
+
+local is_hand = false
+local sprangato = false
+local spranga_t = 0
+local barbero_img = love.graphics.newImage("image/barbero.png")
+
+local event = {}
+
+local chiave = false
+local porta = false
+local porta_t = 0
+
+local cassetti_img = {
+  love.graphics.newImage("image/cassetti1.jpg"),
+  love.graphics.newImage("image/cassetti2.jpg"),
+  love.graphics.newImage("image/cassetti3.jpg"),
+  love.graphics.newImage("image/cassetti chiave.png"),
+  love.graphics.newImage("image/cassetti4.png"),
+}
+
+local porta_img = {
+  love.graphics.newImage("image/porta chiave.jpg"),
+  love.graphics.newImage("image/porta poco aperta.jpg"),
+  love.graphics.newImage("image/porta molto aperta.jpg"),
+}
+
+local cube = {n=1, t=0}
+cube.image = {
+  love.graphics.newImage("image/cube1w.png"),
+  love.graphics.newImage("image/cube2w.png"),
+  love.graphics.newImage("image/cube3w.png"),
+  love.graphics.newImage("image/cube4w.png"),
+  love.graphics.newImage("image/cube5w.png"),
+  love.graphics.newImage("image/cube6w.png")
+}
+for i = 1, 8 do
+  local n = love.math.random(1, 6)
+  local x = love.math.random(1, cw)
+  local y = love.math.random(0-20, ch-20)
+  local t = love.math.random()/3
+  cube[#cube+1] = {n=n, x=x, y=y, t=t}
+end
+local play_img = love.graphics.newImage("image/play.png")
+
+function love.update(dt)
+  if love.keyboard.isDown("escape") then
+    love.event.quit()
+  end
+
+  cube.t = cube.t + dt
+  if cube.t > 0.5 then
+    cube.t = cube.t - 0.5
+    cube.n = cube.n + 1
+    if cube.n > 6 then cube.n = cube.n - 6 end
+  end
+
+  if current == "menu" then
+    for ic, c in ipairs(cube) do
+      c.y = c.y + 50*dt
+      if c.y > ch + 20 then
+        c.y = -20
+        c.x = love.math.random(1, cw)
+      end
+      c.t = c.t + dt
+      if c.t > 1/3 then
+        c.t = c.t - 1/3
+        c.n = c.n + 1
+        if c.n > 6 then c.n = c.n - 6 end
+      end
+    end
+  end
+
+  if current == "computer" then
+    if text == "s  p  r  a  n  g  a  " then
+      if sprangato == false then
+        sprangato = true
+        n_cubes = n_cubes + 1
+      end
+    end
+  end
+
+  if event[1] then
+    if event[1] == "chiave" then
+      if n_cubes == 4 then
+        n_cubes = 5
+        chiave = true
+      end
+    end
+
+    if event[1] == "porta" then
+      if chiave then
+        porta = true
+      end
+    end
+
+    table.remove(event, 1)
+  end
+
+  if sprangato then
+    spranga_t = spranga_t + dt
+  end
+
+  if porta then
+    porta_t = porta_t + dt
+  end
+
+  is_hand = false
+  local mx, my = love.mouse.getPosition()
+  mx, my = mx/sc, my/sc
+  for ip, p in ipairs(room[current].polygon) do
+    if pointInPolygon(p, mx, my) then
+      is_hand = true
+    end
+  end
+  if room[current].left and 10 <= mx and mx <= 180 and 10 <= my and my <= 750 then
+    is_hand = true
+  end
+  if room[current].right and cw-180 <= mx and mx <= cw-10 and 10 <= my and my <= 750 then
+    is_hand = true
+  end
+  if room[current].back and 10 <= mx and mx <= cw-10 and 800 <= my and my <= ch-10 then
+    is_hand = true
+  end
+
+  if is_hand then
+    love.mouse.setCursor(hand)
+  else
+    love.mouse.setCursor(arrow)
+  end
+end
+
+function love.keypressed(key, scancode, isrepeat)
+  if current == "computer" then
+    if #text <= 20 then
+      local key_table = {"a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"}
+      for ik, k in ipairs(key_table) do
+        if key == k then
+          text = text .. k .. "  "
+        end
+      end
+    end
+    if key == "backspace" then
+      text = text:sub(1, -2)
+      text = text:sub(1, -2)
+      text = text:sub(1, -2)
+    end
+  end
+
+  if key == "tab" then
+    n_cubes = n_cubes + 1
+  end
+end
+
+function love.mousepressed(x, y, button, istouch, presses)
+  x = x/sc
+  y = y/sc
+  for ip, p in ipairs(room[current].polygon) do
+    if pointInPolygon(p, x, y) then
+      if p.type == "move" then
+        current = p.what
+      elseif p.type == "event" then
+        table.insert(event, p.what)
+      end
+    end
+  end
+
+  if room[current].left then
+    if 10 <= x and x <= 180 and 10 <= y and y <= 750 then
+      current = room[current].left
+    end
+  end
+
+  if room[current].right then
+    if cw-180 <= x and x <= cw-10 and 10 <= y and y <= 750 then
+      current = room[current].right
+    end
+  end
+
+  if room[current].back then
+    if 10 <= x and x <= cw-10 and 800 <= y and y <= ch-10 then
+      current = room[current].back
+    end
+  end
+end
+
+local canvas = love.graphics.newCanvas(cw, ch)
+local font = love.graphics.newFont(55)
+love.graphics.setFont(font)
+function love.draw()
+  love.graphics.setCanvas(canvas)
+  love.graphics.clear(0, 0, 0)
+
+  love.graphics.setColor(1, 1, 1, 1)
+  love.graphics.draw(room[current].image)
+
+  if current == "menu" then
+    for ic, c in ipairs(cube) do
+      love.graphics.draw(cube.image[c.n], c.x, c.y, 0, 0.5)
+    end
+
+    local img = cube.image[cube.n]
+    love.graphics.draw(img, cw/2, 600, 0, 1.2, 1.2, img:getWidth()/2, img:getHeight()/2)
+    love.graphics.draw(play_img, cw/2, 600, 0, 0.8, 0.8, play_img:getWidth()/2, play_img:getHeight()/2)
+  end
+
+
+  if current == "computer" then
+    love.graphics.setColor(0, 0, 0)
+    love.graphics.print(text, 470, 260)
+
+    if sprangato then
+      if spranga_t < 1 then
+        local r = love.math.random()
+        local g = love.math.random()
+        local b = love.math.random()
+        local x = love.math.random()*10-5
+        local y = love.math.random()*10-5
+        love.graphics.setColor(r, g, b, 0.9)
+        love.graphics.draw(barbero_img, 100+x, y)
+      elseif spranga_t < 5 then
+        love.graphics.setColor(1, 1, 1, 1 - (spranga_t-1)/5)
+        love.graphics.draw(cube.image[cube.n], 500, 340, 0, 2, 2)
+      end
+    end
+  end
+
+  if current == "cassetti" then
+    if n_cubes > 0 then
+      love.graphics.draw(cassetti_img[n_cubes])
+    end
+  end 
+
+  love.graphics.setColor(1, 1, 1)
+  if current == "porta" then
+    if porta then
+      if porta_t < 0.5 then
+        love.graphics.draw(porta_img[1])
+      elseif porta_t < 1 then
+        love.graphics.draw(porta_img[2])
+      elseif porta_t < 2 then
+        love.graphics.draw(porta_img[3])
+      else
+        current = "menu"
+      end
+    end
+  end
+
+  love.graphics.setColor(1, 0, 0, 0.5)
+  for ip, p in ipairs(room[current].polygon) do
+    love.graphics.polygon("fill", p)
+  end
+
+  love.graphics.setCanvas()
+
+  love.graphics.setColor(1, 1, 1)
+  love.graphics.draw(canvas, 0, 0, 0, sc, sc)
+end
