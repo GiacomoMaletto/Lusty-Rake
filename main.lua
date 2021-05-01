@@ -58,7 +58,7 @@ local sc = 2/3
 local arrow = love.mouse.getSystemCursor("arrow")
 local hand = love.mouse.getSystemCursor("hand")
 
-local n_cubes = 0
+local n_cubes = 1
 local text = ""
 
 local n = {}
@@ -195,6 +195,7 @@ room["libreria"].right = "finestra"
 room["lavagna"] = room.new("11.jpg")
 room["lavagna"].left = "scrivania"
 room["lavagna"].right = "libreria"
+table.insert(room["tastiera"].polygon, {1088, 220, 1183, 466, 1222, 475, 1124, 224, type="event", what="re3"})
 
 local pupazzi = 0
 
@@ -565,7 +566,7 @@ function love.draw()
 
   love.graphics.setColor(1, 0, 0, 0.5)
   for ip, p in ipairs(room[current].polygon) do
-    love.graphics.polygon("fill", p)
+    --love.graphics.polygon("fill", p)
   end
 
   love.graphics.setCanvas()
