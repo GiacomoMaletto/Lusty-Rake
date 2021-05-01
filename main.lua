@@ -42,7 +42,8 @@ local function pointInPolygon(pgon, tx, ty)
 		end
  
 		total = total + diff
-		cur_quad = next_quad
+
+    cur_quad = next_quad
 		x1 = x2
 		y1 = y2
 	end
@@ -59,6 +60,34 @@ local hand = love.mouse.getSystemCursor("hand")
 
 local n_cubes = 0
 local text = ""
+
+local n = {}
+n.play = function(name)
+  --print(name, "||", n[name].current)
+  n[name][n[name].current]:play()
+  n[name].current = n[name].current + 1
+  if n[name].current > 10 then
+    n[name].current = 1
+  end
+end
+do
+  local notes = {
+    "fa1", "sol1", "la1", "si1", "do1", "re1", "mi1",
+    "fa2", "sol2", "la2", "si2", "do2", "re2", "mi2",
+    "fa3", "sol3", "la3", "si3", "do3", "re3"
+  }
+
+  for i, v in ipairs(notes) do
+    n[v] = {current=1}
+    for j = 1, 10 do
+      n[v][j] = love.audio.newSource("note/"..v..".mp3", "static")
+    end
+  end
+end
+local queue = {}
+queue.add = function(name, delay)
+  queue[#queue+1] = {name=name, t=delay}
+end
 
 local current = "menu"
 local room = {}
@@ -117,6 +146,7 @@ table.insert(room["cassetti"].polygon, {540, 820, 540, 1000, 700, 1000, 700, 820
 
 room["pupazzi"] = room.new("pupazzi.jpg")
 room["pupazzi"].back = "mobile"
+table.insert(room["pupazzi"].polygon, {1150, 100, 790, 400, 1070, 430, 1260, 260, type="event", what="inizio corvo"})
 
 room["altra scrivania"] = room.new("altra scrivania.jpg")
 room["altra scrivania"].left = "finestra"
@@ -133,6 +163,26 @@ room["libri"].back = "altra scrivania"
 
 room["tastiera"] = room.new("tastiera.jpg")
 room["tastiera"].back = "altra scrivania"
+table.insert(room["tastiera"].polygon, {42, 226, 0, 340, 0, 488, 90, 210, type="event", what="fa1"})
+table.insert(room["tastiera"].polygon, {107, 226, 17, 484, 74, 484, 130, 221, type="event", what="sol1"})
+table.insert(room["tastiera"].polygon, {159, 221, 84, 480, 138, 487, 197, 223, type="event", what="la1"})
+table.insert(room["tastiera"].polygon, {224, 223, 156, 480, 203, 488, 257, 226, type="event", what="si1"})
+table.insert(room["tastiera"].polygon, {275, 211, 221, 485, 275, 482, 311, 216, type="event", what="do1"})
+table.insert(room["tastiera"].polygon, {339, 211, 291, 487, 342, 485, 374, 221, type="event", what="re1"})
+table.insert(room["tastiera"].polygon, {399, 213, 361, 475, 412, 482, 431, 221, type="event", what="mi1"})
+table.insert(room["tastiera"].polygon, {448, 223, 428, 480, 471, 477, 482, 231, type="event", what="fa2"})
+table.insert(room["tastiera"].polygon, {503, 224, 490, 474, 537, 475, 529, 229, type="event", what="sol2"})
+table.insert(room["tastiera"].polygon, {562, 228, 552, 482, 604, 482, 593, 229, type="event", what="la2"})
+table.insert(room["tastiera"].polygon, {619, 220, 619, 482, 666, 479, 642, 228, type="event", what="si2"})
+table.insert(room["tastiera"].polygon, {658, 226, 681, 474, 728, 474, 692, 234, type="event", what="do2"})
+table.insert(room["tastiera"].polygon, {722, 216, 748, 469, 787, 479, 749, 226, type="event", what="re2"})
+table.insert(room["tastiera"].polygon, {775, 224, 810, 475, 852, 475, 808, 228, type="event", what="mi2"})
+table.insert(room["tastiera"].polygon, {821, 220, 867, 474, 915, 467, 852, 220, type="event", what="fa3"})
+table.insert(room["tastiera"].polygon, {878, 224, 930, 471, 976, 475, 904, 226, type="event", what="sol3"})
+table.insert(room["tastiera"].polygon, {937, 221, 997, 471, 1043, 471, 963, 224, type="event", what="la3"})
+table.insert(room["tastiera"].polygon, {987, 220, 1056, 469, 1103, 471, 1017, 218, type="event", what="si3"})
+table.insert(room["tastiera"].polygon, {1033, 221, 1119, 472, 1166, 474, 1072, 226, type="event", what="do3"})
+table.insert(room["tastiera"].polygon, {1088, 220, 1183, 466, 1222, 475, 1124, 224, type="event", what="re3"})
 
 room["finestra"] = room.new("finestra.jpg")
 room["finestra"].left = "libreria"
@@ -145,6 +195,8 @@ room["libreria"].right = "finestra"
 room["lavagna"] = room.new("11.jpg")
 room["lavagna"].left = "scrivania"
 room["lavagna"].right = "libreria"
+
+local pupazzi = 0
 
 local is_hand = false
 local sprangato = false
@@ -189,9 +241,43 @@ for i = 1, 8 do
 end
 local play_img = love.graphics.newImage("image/play.png")
 
+local musica = {"d","r","d","m","m","r","d","r","s","s","r","m","r","f","f","s","l","s"}
+local progresso = 0
+
+local cassetto = false
+local cassetto_t = 0
+
+local cassetto_img = love.graphics.newImage("image/yee.jpg")
+
+local corvo_img = {
+  love.graphics.newImage("image/corvo 1.jpg"),
+  love.graphics.newImage("image/corvo 2.jpg"),
+  love.graphics.newImage("image/corvo 3.jpg"),
+  love.graphics.newImage("image/corvo 4.jpg"),
+  love.graphics.newImage("image/corvo 5.jpg"),
+  love.graphics.newImage("image/corvo 6.jpg"),
+  love.graphics.newImage("image/corvo 7.jpg"),
+  love.graphics.newImage("image/corvo 8.jpg"),
+  love.graphics.newImage("image/corvo 9.jpg")
+}
+local corvo = 0
+local cubo_corvo = false
+local cubo_corvo_t = 0
+
 function love.update(dt)
   if love.keyboard.isDown("escape") then
     love.event.quit()
+  end
+
+  for i = #queue, 1, -1 do
+    if queue[i].t <= 0 then
+      n.play(queue[i].name)
+      table.remove(queue, i)
+    end
+  end
+
+  for i = 1, #queue do
+    queue[i].t = queue[i].t - dt
   end
 
   cube.t = cube.t + dt
@@ -240,15 +326,62 @@ function love.update(dt)
       end
     end
 
+    local nota=false
+    if event[1] == "fa1" then queue.add("fa1", 0); nota="f" end
+    if event[1] == "sol1" then queue.add("sol1", 0); nota="s" end
+    if event[1] == "la1" then queue.add("la1", 0); nota="l" end
+    if event[1] == "si1" then queue.add("si1", 0); nota="s" end
+    if event[1] == "do1" then queue.add("do1", 0); nota="d" end
+    if event[1] == "re1" then queue.add("re1", 0); nota="r" end
+    if event[1] == "mi1" then queue.add("mi1", 0); nota="m" end
+    if event[1] == "fa2" then queue.add("fa2", 0); nota="f" end
+    if event[1] == "sol2" then queue.add("sol2", 0); nota="s" end
+    if event[1] == "la2" then queue.add("la2", 0); nota="l" end
+    if event[1] == "si2" then queue.add("si2", 0); nota="s" end
+    if event[1] == "do2" then queue.add("do2", 0); nota="d" end
+    if event[1] == "re2" then queue.add("re2", 0); nota="r" end
+    if event[1] == "mi2" then queue.add("mi2", 0); nota="m" end
+    if event[1] == "fa3" then queue.add("fa3", 0); nota="f" end
+    if event[1] == "sol3" then queue.add("sol3", 0); nota="s" end
+    if event[1] == "la3" then queue.add("la3", 0); nota="l" end
+    if event[1] == "si3" then queue.add("si3", 0); nota="s" end
+    if event[1] == "do3" then queue.add("do3", 0); nota="d" end
+    if event[1] == "re3" then queue.add("re3", 0); nota="r" end
+    if nota then
+      --print(progresso, nota, musica[progresso+1])
+      if nota == musica[progresso+1] then
+        progresso = progresso + 1
+        print(progresso)
+        if progresso == 18 and not cassetto then
+          cassetto = true
+          n_cubes = n_cubes + 1
+        end
+      else
+        progresso = 0
+      end
+    end
+
+    if event[1] == "inizio corvo" and corvo == 0 then
+      corvo = corvo + 1
+    end
+
     table.remove(event, 1)
   end
-
+  --print(progresso)
   if sprangato then
     spranga_t = spranga_t + dt
   end
 
   if porta then
     porta_t = porta_t + dt
+  end
+
+  if cassetto then
+    cassetto_t = cassetto_t + dt
+  end
+
+  if cubo_corvo then
+    cubo_corvo_t = cubo_corvo_t + dt
   end
 
   is_hand = false
@@ -298,6 +431,8 @@ function love.keypressed(key, scancode, isrepeat)
   end
 end
 
+
+
 function love.mousepressed(x, y, button, istouch, presses)
   x = x/sc
   y = y/sc
@@ -326,6 +461,14 @@ function love.mousepressed(x, y, button, istouch, presses)
   if room[current].back then
     if 10 <= x and x <= cw-10 and 800 <= y and y <= ch-10 then
       current = room[current].back
+    end
+  end
+
+  if current == "pupazzi" and corvo > 0 and corvo < 9 then
+    corvo = corvo + 1
+    if corvo == 9 then
+      cubo_corvo = true
+      n_cubes = n_cubes + 1
     end
   end
 end
@@ -377,6 +520,19 @@ function love.draw()
     end
   end 
 
+  if current == "tastiera" then
+    if cassetto then
+      if cassetto_t < 5 then
+        love.graphics.draw(cassetto_img)
+      end
+      if cassetto_t < 5 then
+        love.graphics.setColor(1, 1, 1, 1 - (spranga_t-1)/5)
+        local img = cube.image[cube.n]
+        love.graphics.draw(img, 912, 694, 0, 1, 1, img:getWidth()/2, img:getHeight()/2)
+      end
+    end
+  end
+
   love.graphics.setColor(1, 1, 1)
   if current == "porta" then
     if porta then
@@ -388,6 +544,21 @@ function love.draw()
         love.graphics.draw(porta_img[3])
       else
         current = "menu"
+      end
+    end
+  end
+
+  love.graphics.setColor(1, 1, 1)
+  if current == "pupazzi" then
+    if corvo > 0 then
+      love.graphics.draw(corvo_img[corvo])
+    end
+
+    if corvo == 9 then
+      if cubo_corvo_t < 5 then
+        love.graphics.setColor(1, 1, 1, 1 - (cubo_corvo_t-1)/5)
+        local img = cube.image[cube.n]
+        love.graphics.draw(img, 550, 830, 0, 1, 1, img:getWidth()/2, img:getHeight()/2)
       end
     end
   end
