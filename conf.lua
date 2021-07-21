@@ -3,4 +3,5 @@ function love.conf(t)
   --t.window.fullscreen = true
   t.window.width = 1280*2/3
   t.window.height = 960*2/3
+  t.window.title = "Lusty Rake - Giacomino's Room"
 end

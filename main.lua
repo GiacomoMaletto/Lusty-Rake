@@ -58,7 +58,7 @@ local sc = 2/3
 local arrow = love.mouse.getSystemCursor("arrow")
 local hand = love.mouse.getSystemCursor("hand")
 
-local n_cubes = 1
+local n_cubes = 0
 local text = ""
 
 local n = {}
@@ -100,7 +100,7 @@ room["menu"].polygon[1] = {450, 510, 450, 660, 850, 660, 850, 510, type="move", 
 room["panoramica"] = room.new("panoramica.jpg")
 room["panoramica"].left = "scrivania"
 room["panoramica"].right = "letto"
-room["panoramica"].back = "armadione"
+--room["panoramica"].back = "armadione"
 
 room["scrivania"] = room.new("scrivania.jpg")
 room["scrivania"].left = "porta"
@@ -132,7 +132,7 @@ table.insert(room["porta"].polygon, {200, 40, 200, 880, 600, 880, 600, 40, type=
 room["armadione"] = room.new("armadione.jpg")
 room["armadione"].left = "letto"
 room["armadione"].right = "porta"
-room["armadione"].back = "panoramica"
+--room["armadione"].back = "panoramica"
 
 room["mobile"] = room.new("mobile.jpg")
 room["mobile"].left = "altra scrivania"
@@ -157,9 +157,15 @@ table.insert(room["altra scrivania"].polygon, {330, 400, 200, 740, 960, 730, 880
 
 room["presa"] = room.new("presa staccata.jpg")
 room["presa"].back = "altra scrivania"
+table.insert(room["presa"].polygon, {625.5, 298.5, 784.5, 303, 777, 394.5, 622.5, 387, type="event", what="presa_collegata"})
 
 room["libri"] = room.new("libri.jpg")
 room["libri"].back = "altra scrivania"
+table.insert(room["libri"].polygon, {204,118.5,307.5,120,376.5,640.5,274.5,636, type="move", what="divina"})
+
+room["divina"] = room.new("dante.jpg")
+room["divina"].back = "libri"
+table.insert(room["divina"].polygon, {286.5,342,738,252,867,792,286.5,769.5, type="event", what="commedia_aperta"})
 
 room["tastiera"] = room.new("tastiera.jpg")
 room["tastiera"].back = "altra scrivania"
@@ -195,7 +201,12 @@ room["libreria"].right = "finestra"
 room["lavagna"] = room.new("11.jpg")
 room["lavagna"].left = "scrivania"
 room["lavagna"].right = "libreria"
-table.insert(room["tastiera"].polygon, {1088, 220, 1183, 466, 1222, 475, 1124, 224, type="event", what="re3"})
+table.insert(room["lavagna"].polygon, {735,405,787.5,406.5,789,453,735,456, type="event", what="spalla_dx"})
+table.insert(room["lavagna"].polygon, {981,408,1042.5,406.5,1047,451.5,991.5,454.5, type="event", what="spalla_sx"})
+table.insert(room["lavagna"].polygon, {732,555,799.5,558,799.5,595.5,747,600, type="event", what="gomito_dx_giu"})
+table.insert(room["lavagna"].polygon, {1008,558,1069.5,561,1069.5,598.5,1018.5,600, type="event", what="gomito_sx_giu"})
+table.insert(room["lavagna"].polygon, {660,283.5,750,282,762,327,670.5,343.5, type="event", what="gomito_dx_su"})
+table.insert(room["lavagna"].polygon, {1021.5,276,1092,277.5,1074,342,1018.5,334.5, type="event", what="gomito_sx_su"})
 
 local pupazzi = 0
 
@@ -265,7 +276,30 @@ local corvo = 0
 local cubo_corvo = false
 local cubo_corvo_t = 0
 
+local collegato_a_corrente = false
+
+local presa_img = {
+  love.graphics.newImage("image/presa staccata.jpg"),
+  love.graphics.newImage("image/presa attaccata.jpg")
+}
+
+local commedia_n = 0
+commedia_img = love.graphics.newImage("image/spranga.jpg")
+
+local scheletro_img = {}
+for dx = 1, 4 do
+  for dy = 1, 4 do
+    scheletro_img[dx*10+dy] = love.graphics.newImage("image/"..dx..dy..".jpg")
+  end
+end
+local scheletro = {spalla_dx=0, spalla_sx=0, gomito_dx=0, gomito_sx=0}
+
+local ymca_fill = 0
+local ymca_start = false
+local ymca_t = 0
+
 function love.update(dt)
+  --print(current)
   if love.keyboard.isDown("escape") then
     love.event.quit()
   end
@@ -328,31 +362,33 @@ function love.update(dt)
     end
 
     local nota=false
-    if event[1] == "fa1" then queue.add("fa1", 0); nota="f" end
-    if event[1] == "sol1" then queue.add("sol1", 0); nota="s" end
-    if event[1] == "la1" then queue.add("la1", 0); nota="l" end
-    if event[1] == "si1" then queue.add("si1", 0); nota="s" end
-    if event[1] == "do1" then queue.add("do1", 0); nota="d" end
-    if event[1] == "re1" then queue.add("re1", 0); nota="r" end
-    if event[1] == "mi1" then queue.add("mi1", 0); nota="m" end
-    if event[1] == "fa2" then queue.add("fa2", 0); nota="f" end
-    if event[1] == "sol2" then queue.add("sol2", 0); nota="s" end
-    if event[1] == "la2" then queue.add("la2", 0); nota="l" end
-    if event[1] == "si2" then queue.add("si2", 0); nota="s" end
-    if event[1] == "do2" then queue.add("do2", 0); nota="d" end
-    if event[1] == "re2" then queue.add("re2", 0); nota="r" end
-    if event[1] == "mi2" then queue.add("mi2", 0); nota="m" end
-    if event[1] == "fa3" then queue.add("fa3", 0); nota="f" end
-    if event[1] == "sol3" then queue.add("sol3", 0); nota="s" end
-    if event[1] == "la3" then queue.add("la3", 0); nota="l" end
-    if event[1] == "si3" then queue.add("si3", 0); nota="s" end
-    if event[1] == "do3" then queue.add("do3", 0); nota="d" end
-    if event[1] == "re3" then queue.add("re3", 0); nota="r" end
+    if collegato_a_corrente then
+      if event[1] == "fa1" then queue.add("fa1", 0); nota="f" end
+      if event[1] == "sol1" then queue.add("sol1", 0); nota="s" end
+      if event[1] == "la1" then queue.add("la1", 0); nota="l" end
+      if event[1] == "si1" then queue.add("si1", 0); nota="s" end
+      if event[1] == "do1" then queue.add("do1", 0); nota="d" end
+      if event[1] == "re1" then queue.add("re1", 0); nota="r" end
+      if event[1] == "mi1" then queue.add("mi1", 0); nota="m" end
+      if event[1] == "fa2" then queue.add("fa2", 0); nota="f" end
+      if event[1] == "sol2" then queue.add("sol2", 0); nota="s" end
+      if event[1] == "la2" then queue.add("la2", 0); nota="l" end
+      if event[1] == "si2" then queue.add("si2", 0); nota="s" end
+      if event[1] == "do2" then queue.add("do2", 0); nota="d" end
+      if event[1] == "re2" then queue.add("re2", 0); nota="r" end
+      if event[1] == "mi2" then queue.add("mi2", 0); nota="m" end
+      if event[1] == "fa3" then queue.add("fa3", 0); nota="f" end
+      if event[1] == "sol3" then queue.add("sol3", 0); nota="s" end
+      if event[1] == "la3" then queue.add("la3", 0); nota="l" end
+      if event[1] == "si3" then queue.add("si3", 0); nota="s" end
+      if event[1] == "do3" then queue.add("do3", 0); nota="d" end
+      if event[1] == "re3" then queue.add("re3", 0); nota="r" end
+    end
     if nota then
       --print(progresso, nota, musica[progresso+1])
       if nota == musica[progresso+1] then
         progresso = progresso + 1
-        print(progresso)
+        --print(progresso)
         if progresso == 18 and not cassetto then
           cassetto = true
           n_cubes = n_cubes + 1
@@ -364,6 +400,33 @@ function love.update(dt)
 
     if event[1] == "inizio corvo" and corvo == 0 then
       corvo = corvo + 1
+    end
+
+    if event[1] == "presa_collegata" then
+      collegato_a_corrente = true
+    end
+
+    if event[1] == "commedia_aperta" then
+      commedia_n = 1
+    end
+
+    if event[1] == "spalla_dx" then
+      scheletro.spalla_dx = 1 - scheletro.spalla_dx
+    end
+    if event[1] == "spalla_sx" then
+      scheletro.spalla_sx = 1 - scheletro.spalla_sx
+    end
+    if event[1] == "gomito_dx_giu" and scheletro.spalla_dx==0 then
+      scheletro.gomito_dx = 1 - scheletro.gomito_dx
+    end
+    if event[1] == "gomito_dx_su" and scheletro.spalla_dx==1 then
+      scheletro.gomito_dx = 1 - scheletro.gomito_dx
+    end
+    if event[1] == "gomito_sx_giu" and scheletro.spalla_sx==0 then
+      scheletro.gomito_sx = 1 - scheletro.gomito_sx
+    end
+    if event[1] == "gomito_sx_su" and scheletro.spalla_sx==1 then
+      scheletro.gomito_sx = 1 - scheletro.gomito_sx
     end
 
     table.remove(event, 1)
@@ -383,6 +446,10 @@ function love.update(dt)
 
   if cubo_corvo then
     cubo_corvo_t = cubo_corvo_t + dt
+  end
+
+  if ymca_start then
+    ymca_t = ymca_t + dt
   end
 
   is_hand = false
@@ -427,8 +494,14 @@ function love.keypressed(key, scancode, isrepeat)
     end
   end
 
-  if key == "tab" then
-    n_cubes = n_cubes + 1
+  --if key == "tab" then
+  --  n_cubes = n_cubes + 1
+  --end
+
+  if key == "space" then
+    local mx, my = love.mouse.getPosition()
+    mx, my = mx/sc, my/sc
+    --print(mx, my)
   end
 end
 
@@ -527,7 +600,7 @@ function love.draw()
         love.graphics.draw(cassetto_img)
       end
       if cassetto_t < 5 then
-        love.graphics.setColor(1, 1, 1, 1 - (spranga_t-1)/5)
+        love.graphics.setColor(1, 1, 1, 1 - (cassetto_t-1)/5)
         local img = cube.image[cube.n]
         love.graphics.draw(img, 912, 694, 0, 1, 1, img:getWidth()/2, img:getHeight()/2)
       end
@@ -564,10 +637,65 @@ function love.draw()
     end
   end
 
-  love.graphics.setColor(1, 0, 0, 0.5)
-  for ip, p in ipairs(room[current].polygon) do
-    --love.graphics.polygon("fill", p)
+  if current == "presa" then
+    if collegato_a_corrente then
+      love.graphics.draw(presa_img[2])
+    end
   end
+
+  if current == "divina" then
+    if commedia_n == 1 then
+      love.graphics.draw(commedia_img)
+    end
+  end
+
+  if current == "lavagna" then
+    local dx = 1 + 2*scheletro.spalla_dx + scheletro.gomito_dx
+    local sx = 1 + 2*scheletro.spalla_sx + scheletro.gomito_sx
+    local str = dx*10 + sx
+    if ymca_fill==0 and str==33 then
+      ymca_fill=1
+    end
+    if ymca_fill==1 and str==44 then
+      ymca_fill=2
+    end
+    if ymca_fill==2 and str==42 then
+      ymca_fill=3
+    end
+    if ymca_fill==3 and str==44 then
+      ymca_fill=4
+      ymca_start = true
+      n_cubes = n_cubes + 1
+    end
+    love.graphics.draw(scheletro_img[str])
+    if ymca_fill>=1 then
+      love.graphics.setColor(1/3, 1/5, 1/2)
+      love.graphics.print("Y", 380, 200, 0, 2, 2)
+    end
+    if ymca_fill>=2 then
+      love.graphics.setColor(2/3, 1, 0)
+      love.graphics.print("M", 420, 190, 0, 2, 2)
+    end
+    if ymca_fill>=3 then
+      love.graphics.setColor(1, 2/3, 0)
+      love.graphics.print("C", 490, 180, 0, 2, 2)
+    end
+    if ymca_fill>=4 then
+      love.graphics.setColor(2/3, 0, 0)
+      love.graphics.print("A", 550, 170, 0, 2, 2)
+    end
+    if ymca_start and ymca_t < 5 then
+      love.graphics.setColor(1, 1, 1, 1 - (ymca_t-1)/5)
+      local img = cube.image[cube.n]
+      love.graphics.draw(img, 496.5,336, 0, 1, 1, img:getWidth()/2, img:getHeight()/2)
+    end
+    love.graphics.setColor(1,1,1)
+  end
+
+  --love.graphics.setColor(1, 0, 0, 0.5)
+  --for ip, p in ipairs(room[current].polygon) do
+  --  love.graphics.polygon("fill", p)
+  --end
 
   love.graphics.setCanvas()
 
